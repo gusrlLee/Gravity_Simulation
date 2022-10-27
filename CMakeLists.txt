@@ -18,7 +18,7 @@ set(GLM_INCLUDE_DIRS /opt/homebrew/Cellar/glm/0.9.9.8/include)
 # check directory
 add_subdirectory(glad)
 
-add_executable(${PROJECT_NAME} src/main.cpp src/controls.cpp)
+add_executable(${PROJECT_NAME} src/main.cpp)
 
 target_link_directories(${PROJECT_NAME} PUBLIC
     ${GLFW_LIBRARY_DIRS}
@@ -35,8 +35,8 @@ target_include_directories( ${PROJECT_NAME} PUBLIC
     ${OpenGL_INCLUDE_DIRS}
     ${CMAKE_CURRENT_SOURCE_DIR}/glad/include
     ${GLFW_INCLUDE_DIRS}
-    ${CMAKE_SOURCE_DIR}/include
-    ${CMAKE_SOURCE_DIR}/include/stb_image.h
+    #${CMAKE_SOURCE_DIR}/include
+    #${CMAKE_SOURCE_DIR}/include/stb_image.h
     ${GLM_INCLUDE_DIRS}
     ${ASSIMP_INCLUDE_DIRS}
 )
