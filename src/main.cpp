@@ -157,6 +157,10 @@ int main() {
         }
     }
 
+    for (int i=0; i<amount; i++) {
+        square_container[i].life = -1.0f;
+    }
+
     // binding VAO
     unsigned int VAO;
     glGenVertexArrays(1, &VAO);
@@ -170,19 +174,22 @@ int main() {
 
     // define vertex buffer 
     glEnableVertexAttribArray(0);
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void*) 0);
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), (void*) 0);
+    glEnableVertexAttribArray(1);
+    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), (void*) (3 * sizeof(float)));
 
     unsigned int square_position_data_buffer;
     glGenBuffers(1, &square_position_data_buffer);
     glBindBuffer(GL_ARRAY_BUFFER, square_position_data_buffer);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(glm::vec3) * amount, &square_position_buffer[0], GL_DYNAMIC_DRAW);
+    // glBufferData(GL_ARRAY_BUFFER, sizeof(glm::vec3) * amount, &square_position_buffer[0], GL_DYNAMIC_DRAW);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(glm::vec3) * amount, NULL, GL_DYNAMIC_DRAW);
 
-    // define vertex buffer 
-    glEnableVertexAttribArray(1);
-    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*) 0);
-    glVertexAttribDivisor(1, 1); 
+//    // define vertex buffer 
+//    glEnableVertexAttribArray(1);
+//    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*) 0);
+//    glVertexAttribDivisor(1, 1); 
 
-    glBindBuffer(GL_ARRAY_BUFFER, 0);
+    // glBindBuffer(GL_ARRAY_BUFFER, 0);
 
     while (!glfwWindowShouldClose(window)) {
         float currentFrame = static_cast<float>(glfwGetTime());
@@ -193,15 +200,71 @@ int main() {
         glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
+        int new_square = (int)(deltaTime * 10000.0);
+        if (new_square > (int)(0.016f * 10000.0))
+            new_square = (int)(0.016f * 10000.0);
+            
+        
+        for (int i=0; i<new_square; i++) {
+            int square_idx = findUnusedIndex();
+            square_container[square_idx].life = 5.0f;
+            square_container[square_idx].pos = glm::vec3(0, 0, -20.0f);
+
+            float spread = 1.0f;
+            glm::vec3 main_dir = glm::vec3(-10.0f, 0.0f, 0.0f);
+            glm::vec3 rand_dir = glm::vec3(
+                    (rand()%2000 - 1000.0f)/1000.0f,
+                    (rand()%2000 - 1000.0f)/1000.0f,
+                    (rand()%2000 - 1000.0f)/1000.0f
+            );
+
+            square_container[square_idx].speed = main_dir + rand_dir * spread;
+        }
+
+        int square_counter = 0;
+        for (int i=0; i<amount; i++) {
+            Square &sq = square_container[i];
+
+            if (sq.life > 0.0f) {
+                sq.life -= deltaTime;
+                if (sq.life > 0.0f) {
+                    sq.speed += glm::vec3(0.0f, -9.81f, 0.0f) * (float)deltaTime * 0.5f;
+                    sq.pos += sq.speed * (float)deltaTime;
+
+                    square_position_buffer[square_counter] = sq.pos;
+                }
+                square_counter++;
+            }
+        }
+
+        glBindBuffer(GL_ARRAY_BUFFER, square_position_data_buffer);
+        glBufferData(GL_ARRAY_BUFFER, sizeof(glm::vec3) * amount, NULL, GL_DYNAMIC_DRAW);
+        glBufferSubData(GL_ARRAY_BUFFER, 0, square_counter * sizeof(glm::vec3), square_position_buffer);
+
+        glEnableVertexAttribArray(2);
+        glBindBuffer(GL_ARRAY_BUFFER, square_position_data_buffer);
+        glVertexAttribPointer(2, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*) 0);
+        glVertexAttribDivisor(2, 1); 
+
         shader.use();
         glm::mat4 projection = glm::perspective(glm::radians(45.0f), (float)SCR_WIDTH / (float)SCR_HEIGHT, 0.1f, 1000.0f);
         glm::mat4 view = camera.GetViewMatrix();
+        glm::mat4 model = glm::mat4(1.0f);
+
+        // vertex shader 
+        shader.setMat4("model",model);
         shader.setMat4("projection", projection);
         shader.setMat4("view", view);
 
+        // fragment shader 
+        shader.setVec3("viewPos", camera.Position);
+
         glBindVertexArray(VAO);
-        glDrawArraysInstanced(GL_TRIANGLES, 0, 36, amount);
+        glDrawArraysInstanced(GL_TRIANGLES, 0, 36, square_counter);
+        
         glBindVertexArray(0);
+        glDisableVertexAttribArray(0);
+        glDisableVertexAttribArray(1);
 
         glfwSwapBuffers(window);
         glfwPollEvents();
