@@ -24,7 +24,7 @@
 const unsigned int SCR_WIDTH = 800;
 const unsigned int SCR_HEIGHT = 600;
 
-Camera camera(glm::vec3(0.0f, 0.0f, 3.0f));
+Camera camera(glm::vec3(0.0f, 0.0f, 10.0f));
 
 float lastX = SCR_WIDTH / 2.0f;
 float lastY = SCR_HEIGHT / 2.0f;
@@ -36,6 +36,7 @@ float lastFrame = 0.0f;
 // square number 
 const int amount = 512000;
 Square square_container[amount];
+glm::vec3 square_position_buffer[amount];
 
 // last used number 
 int last_unused_index = 0;
@@ -137,38 +138,51 @@ int main() {
     }
 
     glEnable(GL_DEPTH_TEST);
-    glDepthFunc(GL_LESS);
 
     // shader load 
     Shader shader("../shader/vertex_shader.glsl", "../shader/fragment_shader.glsl");
-    
-    static float* g_square_position_size_data = new float[amount * 3];
 
-    // binding Vertex Array Object 
+    float offset = 0.5f;
+    int index = 0;
+    for (int z=0; z<80; z++) {
+        for (int y=0; y<80; y++) {
+            for (int x=0; x<80; x++) {
+                glm::vec3 position;
+                position.x = (float)(x - (80/2)) * offset;
+                position.y = (float)(y - (80/2)) * offset;
+                position.z = (float)(z - (80/2)) * offset;
+                square_position_buffer[index] = position;
+                index++;
+            }
+        }
+    }
+
+    // binding VAO
     unsigned int VAO;
     glGenVertexArrays(1, &VAO);
     glBindVertexArray(VAO);
 
-    // for vertex buffer
-    unsigned int square_vertex_buffer;
-    glGenBuffers(1, &square_vertex_buffer);
-    glBindBuffer(GL_ARRAY_BUFFER, square_vertex_buffer);
+    // binding vertex buffer 
+    unsigned int square_vertex_data_buffer;
+    glGenBuffers(1, &square_vertex_data_buffer);
+    glBindBuffer(GL_ARRAY_BUFFER, square_vertex_data_buffer);
     glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
 
-    // for position buffer 
-    unsigned int square_position_buffer;
-    glGenBuffers(1, &square_position_buffer);
-    glBindBuffer(GL_ARRAY_BUFFER, square_position_buffer);
-    glBufferData(GL_ARRAY_BUFFER, amount * 3 * sizeof(float), NULL, GL_STREAM_DRAW);
+    // define vertex buffer 
+    glEnableVertexAttribArray(0);
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void*) 0);
 
+    unsigned int square_position_data_buffer;
+    glGenBuffers(1, &square_position_data_buffer);
+    glBindBuffer(GL_ARRAY_BUFFER, square_position_data_buffer);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(glm::vec3) * amount, &square_position_buffer[0], GL_DYNAMIC_DRAW);
 
-    // initialization vertex data 
-    for (int i=0; i<amount; i++) {
-        square_container[i].life = -1.0f;
-        square_container[i].cameradistance = -1.0f;
-    }
+    // define vertex buffer 
+    glEnableVertexAttribArray(1);
+    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*) 0);
+    glVertexAttribDivisor(1, 1); 
 
-    float lastFrame = static_cast<float>(glfwGetTime());
+    glBindBuffer(GL_ARRAY_BUFFER, 0);
 
     while (!glfwWindowShouldClose(window)) {
         float currentFrame = static_cast<float>(glfwGetTime());
@@ -179,88 +193,22 @@ int main() {
         glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-        int new_squares = (int)(deltaTime * 10000.0);
-        if (new_squares > (int)(0.016f * 10000.0)) 
-            new_squares = (int)(0.016f * 10000.0);
-
-        for (int i=0; i<new_squares; i++) {
-            int square_idx = findUnusedIndex();
-            square_container[square_idx].life = 3.0f;
-            square_container[square_idx].pos = glm::vec3(0, 0, -20.0f);
-
-            float spread = 5.5f;
-            glm::vec3 maindir = glm::vec3(0.0f, -10.0f, 0.0f);
-            // direction + alpha random value 
-            glm::vec3 randomdir = glm::vec3(
-                    (rand()%2000 - 1000.0f)/1000.0f,
-                    (rand()%2000 - 1000.0f)/1000.0f,
-                    (rand()%2000 - 1000.0f)/1000.0f
-            );
-
-            square_container[square_idx].speed = maindir * randomdir * spread;
-            square_container[square_idx].size = (rand() % 10000) / 29000.0f + 0.1f;
-        }
-
-        glm::mat4 projection = glm::perspective(glm::radians(camera.Zoom), (GLfloat)SCR_WIDTH / (GLfloat)SCR_HEIGHT, 0.1f, 100.0f);
-        glm::mat4 view = camera.GetViewMatrix();
-        glm::vec3 camera_position(glm::inverse(view)[3]);
-
-        int squares_counter = 0;
-        for (int i=0; i<amount; i++) {
-            Square& s = square_container[i];
-
-            if (s.life > 0.0f) {
-                s.life -= deltaTime;
-                if (s.life > 0) {
-                    s.speed += glm::vec3(0.0f, -9.81f, 0.0f) * (float)deltaTime * 0.5f;
-                    s.pos += s.speed * (float)deltaTime;
-                    s.cameradistance = glm::length2(s.pos - camera_position);
-
-                    g_square_position_size_data[3 * squares_counter + 0] = s.pos.x;
-                    g_square_position_size_data[3 * squares_counter + 1] = s.pos.y;
-                    g_square_position_size_data[3 * squares_counter + 2] = s.pos.z;
-                }
-                else {
-                    s.cameradistance = -1.0f;
-                }
-                squares_counter++;
-            }
-        }
-
-        // rendering 
-        sortSquare();
-
-        glBindBuffer(GL_ARRAY_BUFFER, square_position_buffer);
-        glBufferData(GL_ARRAY_BUFFER, amount * 3 * sizeof(float), NULL, GL_STREAM_DRAW);
-        glBufferSubData(GL_ARRAY_BUFFER, 0, squares_counter * sizeof(float) * 3, g_square_position_size_data);
-
         shader.use();
+        glm::mat4 projection = glm::perspective(glm::radians(45.0f), (float)SCR_WIDTH / (float)SCR_HEIGHT, 0.1f, 1000.0f);
+        glm::mat4 view = camera.GetViewMatrix();
         shader.setMat4("projection", projection);
         shader.setMat4("view", view);
 
-        glEnableVertexAttribArray(0);
-        glBindBuffer(GL_ARRAY_BUFFER, square_vertex_buffer);
-        glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, (void*) 0);
-
-        glEnableVertexAttribArray(1);
-        glBindBuffer(GL_ARRAY_BUFFER, square_position_buffer);
-        glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 0, (void*) 0);
-
-        glVertexAttribDivisor(0, 0);
-        glVertexAttribDivisor(1, 1);
-
         glBindVertexArray(VAO);
-        glDrawArraysInstanced(GL_TRIANGLE_STRIP, 0, 36, squares_counter);
+        glDrawArraysInstanced(GL_TRIANGLES, 0, 36, amount);
+        glBindVertexArray(0);
 
         glfwSwapBuffers(window);
         glfwPollEvents();
-    
     }
-
-    delete[] g_square_position_size_data;
-    glDeleteBuffers(1, &square_vertex_buffer);
-    glDeleteBuffers(1, &square_position_buffer);
     glDeleteVertexArrays(1, &VAO);
+    glDeleteBuffers(1, &square_vertex_data_buffer);
+    glDeleteBuffers(1, &square_position_data_buffer);
 
     glfwTerminate();
     return 0;
