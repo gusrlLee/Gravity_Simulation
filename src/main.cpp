@@ -24,7 +24,7 @@
 const unsigned int SCR_WIDTH = 800;
 const unsigned int SCR_HEIGHT = 600;
 
-Camera camera(glm::vec3(0.0f, 0.0f, 10.0f));
+Camera camera(glm::vec3(0.0f, 0.0f, -1.0f));
 
 float lastX = SCR_WIDTH / 2.0f;
 float lastY = SCR_HEIGHT / 2.0f;
@@ -34,7 +34,7 @@ float deltaTime = 0.0f;
 float lastFrame = 0.0f;
 
 // square number 
-const int amount = 512000;
+const int amount = 1000000;
 Square square_container[amount];
 glm::vec3 square_position_buffer[amount];
 
@@ -108,6 +108,7 @@ void processInput(GLFWwindow *window) {
         camera.ProcessKeyboard(RIGHT, deltaTime);
 }
 
+
 // MAIN FUNC
 int main() {
     glfwInit();
@@ -141,6 +142,7 @@ int main() {
 
     // shader load 
     Shader shader("../shader/vertex_shader.glsl", "../shader/fragment_shader.glsl");
+    Shader plane_shader("../shader/plane_vertex.glsl", "../shader/plane_fragment.glsl");
 
     float offset = 0.5f;
     int index = 0;
@@ -159,7 +161,18 @@ int main() {
 
     for (int i=0; i<amount; i++) {
         square_container[i].life = -1.0f;
+        square_container[i].up = 0;
     }
+
+    // plane VAO 
+    unsigned int planeVAO, planeVBO;
+    glGenVertexArrays(1, &planeVAO);
+    glGenBuffers(1, &planeVBO);
+    glBindVertexArray(planeVAO);
+    glBindBuffer(GL_ARRAY_BUFFER, planeVBO);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(planeVertices), &planeVertices, GL_STATIC_DRAW);
+    glEnableVertexAttribArray(0);
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
 
     // binding VAO
     unsigned int VAO;
@@ -197,7 +210,7 @@ int main() {
         lastFrame = currentFrame;
         processInput(window);
 
-        glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
+        glClearColor((80.0f / 255.0f), (188.0f/80.0f), (223.0f / 255.0f), 1.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
         int new_square = (int)(deltaTime * 10000.0);
@@ -205,13 +218,14 @@ int main() {
             new_square = (int)(0.016f * 10000.0);
             
         
+        float spread = 5.5f;
         for (int i=0; i<new_square; i++) {
             int square_idx = findUnusedIndex();
             square_container[square_idx].life = 5.0f;
-            square_container[square_idx].pos = glm::vec3(0, 0, -20.0f);
+            square_container[square_idx].pos = glm::vec3(0.0f, 30.0f, 0.0f);
+            square_container[square_idx].up = 0;
 
-            float spread = 1.0f;
-            glm::vec3 main_dir = glm::vec3(-10.0f, 0.0f, 0.0f);
+            glm::vec3 main_dir = glm::vec3(0.0f, -5.0f, 0.0f);
             glm::vec3 rand_dir = glm::vec3(
                     (rand()%2000 - 1000.0f)/1000.0f,
                     (rand()%2000 - 1000.0f)/1000.0f,
@@ -228,6 +242,19 @@ int main() {
             if (sq.life > 0.0f) {
                 sq.life -= deltaTime;
                 if (sq.life > 0.0f) {
+                    if (sq.pos.y < 0.0f && sq.up == 0) {
+                        sq.life = 0.05f;
+                        sq.up = 1;
+
+                        glm::vec3 main_dir = glm::vec3(0.0f, 5.0f, 0.0f);
+                        glm::vec3 rand_dir = glm::vec3(
+                                (rand()%2000 - 1000.0f)/1000.0f,
+                                (rand()%2000 - 1000.0f)/1000.0f,
+                                (rand()%2000 - 1000.0f)/1000.0f
+                        );
+                        sq.speed = main_dir + rand_dir * spread;
+                    }
+
                     sq.speed += glm::vec3(0.0f, -9.81f, 0.0f) * (float)deltaTime * 0.5f;
                     sq.pos += sq.speed * (float)deltaTime;
 
@@ -237,6 +264,12 @@ int main() {
             }
         }
 
+        glm::mat4 projection = glm::perspective(glm::radians(45.0f), (float)SCR_WIDTH / (float)SCR_HEIGHT, 0.1f, 1000.0f);
+        glm::mat4 view = camera.GetViewMatrix();
+        glm::mat4 model = glm::mat4(1.0f);
+
+
+        // draw plane 
         glBindBuffer(GL_ARRAY_BUFFER, square_position_data_buffer);
         glBufferData(GL_ARRAY_BUFFER, sizeof(glm::vec3) * amount, NULL, GL_DYNAMIC_DRAW);
         glBufferSubData(GL_ARRAY_BUFFER, 0, square_counter * sizeof(glm::vec3), square_position_buffer);
@@ -247,9 +280,6 @@ int main() {
         glVertexAttribDivisor(2, 1); 
 
         shader.use();
-        glm::mat4 projection = glm::perspective(glm::radians(45.0f), (float)SCR_WIDTH / (float)SCR_HEIGHT, 0.1f, 1000.0f);
-        glm::mat4 view = camera.GetViewMatrix();
-        glm::mat4 model = glm::mat4(1.0f);
 
         // vertex shader 
         shader.setMat4("model",model);
@@ -262,6 +292,14 @@ int main() {
         glBindVertexArray(VAO);
         glDrawArraysInstanced(GL_TRIANGLES, 0, 36, square_counter);
         
+        // glBindVertexArray(0);
+
+        glBindVertexArray(planeVAO);
+        plane_shader.use();
+        plane_shader.setMat4("projection", projection);
+        plane_shader.setMat4("view", view);
+        plane_shader.setMat4("model", model);
+        glDrawArrays(GL_TRIANGLES, 0, 6);
         glBindVertexArray(0);
         glDisableVertexAttribArray(0);
         glDisableVertexAttribArray(1);
@@ -269,6 +307,7 @@ int main() {
         glfwSwapBuffers(window);
         glfwPollEvents();
     }
+
     glDeleteVertexArrays(1, &VAO);
     glDeleteBuffers(1, &square_vertex_data_buffer);
     glDeleteBuffers(1, &square_position_data_buffer);
