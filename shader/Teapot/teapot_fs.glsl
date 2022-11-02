@@ -53,5 +53,5 @@ void main()
     vec3 I = normalize(FragPos - viewPos);
     vec3 R = reflect(I, normalize(Normal));
 
-    FragColor = mix(vec4(texture(skybox, R).rgb, 1.0), vec4(result, 1.0), 0.75);
+    FragColor = mix(vec4(texture(skybox, R).rgb, 1.0), vec4(result, 1.0), 0.80);
 }
