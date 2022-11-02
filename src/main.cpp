@@ -43,7 +43,7 @@ float deltaTime = 0.0f;
 float lastFrame = 0.0f;
 
 // light Position 
-glm::vec3 light_position(1.2f, 1.0f, 2.0f);
+glm::vec3 light_position(0.0f, 50.0f, 40.0f);
 
 // squre amount 
 const int amount = 1000000;
@@ -236,7 +236,6 @@ int main() {
     glBufferData(GL_ARRAY_BUFFER, sizeof(skyboxVertices), &skyboxVertices, GL_STATIC_DRAW);
     glEnableVertexAttribArray(0);
     glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
-
     
     std::vector<std::string> faces;
 
@@ -252,6 +251,7 @@ int main() {
 
     // for teapot 
     teapot_shader.use();
+    teapot_shader.setInt("skybox", 0);
     teapot_shader.setInt("material.diffuse", 0);
     teapot_shader.setInt("material.specular", 1);
 
@@ -276,14 +276,14 @@ int main() {
         teapot_shader.use();
         teapot_shader.setVec3("light.position", light_position);
         teapot_shader.setVec3("viewPos", camera.Position);
-
+        teapot_shader.setVec3("lightPos", light_position);
+        teapot_shader.setVec3("lightColor", glm::vec3(0.0f, 1.0f, 1.0f));
         teapot_shader.setVec3("light.ambient", 0.2f, 0.2f, 0.2f);
         teapot_shader.setVec3("light.diffuse", 0.5f, 0.5f, 0.5f);
         teapot_shader.setVec3("light.specular", 1.0f, 1.0f, 1.0f);
 
         // material properties
         teapot_shader.setFloat("material.shininess", 64.0f);
-
         teapot_shader.setMat4("projection", projection);
         teapot_shader.setMat4("view", view);
         glm::mat4 teapot_model = glm::mat4(1.0f);
@@ -291,6 +291,8 @@ int main() {
         teapot_model = glm::scale(teapot_model, glm::vec3(1.0f, 1.0f, 1.0f));
         teapot_model = glm::rotate(teapot_model, glm::radians(-30.0f), glm::vec3(0.0f, 0.0f, 1.0f));
         teapot_shader.setMat4("model", teapot_model);
+        glActiveTexture(GL_TEXTURE0);
+        glBindTexture(GL_TEXTURE_CUBE_MAP, cubmap_texture);
         teapot.Draw(teapot_shader);
 
         // draw skybox as last
