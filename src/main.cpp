@@ -24,7 +24,6 @@
 
 // for data 
 #include "data.h"
-#include "util.h"
 
 // window size 
 const unsigned int SCR_WIDTH = 1280;
@@ -46,7 +45,7 @@ float lastFrame = 0.0f;
 glm::vec3 light_position(0.0f, 50.0f, 40.0f);
 
 // squre amount 
-const int amount = 1000000;
+const int amount = 3000000;
 // position array 
 Square square_container[amount];
 glm::vec3 square_position_buffer[amount];
@@ -219,6 +218,8 @@ int main() {
 
     // for 3D 
     glEnable(GL_DEPTH_TEST);
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
     
     // Cube Map Shader 
     Shader cube_map_shader("../shader/CubeMap/CubeMap_vs.glsl", "../shader/CubeMap/CubeMap_fs.glsl");
@@ -245,9 +246,11 @@ int main() {
 
     // define vertex buffer 
     glEnableVertexAttribArray(0);
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), (void*) 0);
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*) 0);
     glEnableVertexAttribArray(1);
-    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), (void*) (3 * sizeof(float)));
+    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*) (3 * sizeof(float)));
+    glEnableVertexAttribArray(2);
+    glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*) (6 * sizeof(float)));
 
     unsigned int square_position_data_buffer;
     glGenBuffers(1, &square_position_data_buffer);
@@ -281,8 +284,31 @@ int main() {
 
     unsigned int cubmap_texture = loadCubemap(faces);
 
+    // for water box 
+    unsigned int water_texture;
+    glGenTextures(1, &water_texture);
+    glBindTexture(GL_TEXTURE_2D, water_texture);
+    // set the texture wrapping parameters
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT); 
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+    // set texture filtering parameters
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    int width, height, nrChannels;
+    unsigned char* texture = stbi_load(FileSystem::getPath("resource/texture/bottom.jpg").c_str(), &width, &height, &nrChannels, 0);
+    if ( texture ) {
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, texture);
+        glGenerateMipmap(GL_TEXTURE_2D);
+    }    
+    else {
+        std::cout << "Failed to load texture" << std::endl;
+    }
+    stbi_image_free(texture);
+
+
+
     shader.use();
-    shader.setInt("skybox", 0);
+    shader.setInt("water_texture", 0);
 
     // for teapot 
     teapot_shader.use();
@@ -337,19 +363,6 @@ int main() {
             if (sq.life > 0.0f) {
                 sq.life -= deltaTime;
                 if (sq.life > 0.0f) {
-//                    if (sq.pos.y < 0.0f && sq.up == 0) {
-//                        sq.life = 0.05f;
-//                        sq.up = 1;
-//
-//                        glm::vec3 main_dir = glm::vec3(0.0f, 5.0f, 0.0f);
-//                        glm::vec3 rand_dir = glm::vec3(
-//                                (rand()%2000 - 1000.0f)/1000.0f,
-//                                (rand()%2000 - 1000.0f)/1000.0f,
-//                                (rand()%2000 - 1000.0f)/1000.0f
-//                        );
-//                        sq.speed = main_dir + rand_dir * spread;
-//                    }
-
                     sq.speed += glm::vec3(0.0f, -9.81f, 0.0f) * (float)deltaTime * 0.5f;
                     sq.pos += sq.speed * (float)deltaTime;
 
@@ -377,13 +390,13 @@ int main() {
         glBufferData(GL_ARRAY_BUFFER, sizeof(glm::vec3) * amount, NULL, GL_DYNAMIC_DRAW);
         glBufferSubData(GL_ARRAY_BUFFER, 0, square_counter * sizeof(glm::vec3), square_position_buffer);
 
-        glEnableVertexAttribArray(2);
+        glEnableVertexAttribArray(3);
         glBindBuffer(GL_ARRAY_BUFFER, square_position_data_buffer);
-        glVertexAttribPointer(2, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*) 0);
-        glVertexAttribDivisor(2, 1); 
+        glVertexAttribPointer(3, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*) 0);
+        glVertexAttribDivisor(3, 1); 
 
         glActiveTexture(GL_TEXTURE0);
-        glBindTexture(GL_TEXTURE_CUBE_MAP, cubmap_texture);
+        glBindTexture(GL_TEXTURE_2D, water_texture);
 
         glDrawArraysInstanced(GL_TRIANGLES, 0, 36, square_counter);
 

@@ -1,17 +1,20 @@
 #version 330 core 
 
 in vec3 Normal;
+in vec2 TexCoord;
 in vec3 FragPos;
 
 out vec4 FragColor;
 
 uniform vec3 viewPos;
 uniform vec3 lightPos;
-uniform samplerCube skybox;
+
+uniform sampler2D water_texture;
 
 void main()
 {
-    vec3 objectColor = vec3(0.0, 0.0, 1.0);
+    vec3 objectColor = vec3(0.0, 0.5, 1.0);
+    // vec3 objectColor = texture(water_texture, TexCoord).rgb;
     vec3 lightColor = vec3(1.0, 1.0, 1.0);
 
     // ambient
@@ -36,8 +39,12 @@ void main()
     float ratio = 1.00 / 1.52;
     vec3 I = normalize(FragPos - viewPos);
     vec3 R = refract(I, normalize(Normal), ratio);
-    FragColor = mix(vec4(texture(skybox, R).rgb, 1.0), vec4(result, 1.0), 0.10);
-    // FragColor = vec4(0.0, 0.0, 0.9, 0.2);
+    // FragColor = mix(vec4(texture(water_texture), 1.0), vec4(result, 1.0), 0.10);
+    //FragColor = mix(texture(water_texture, TexCoord), vec4(result, 1.0), 0.30);
+    FragColor = vec4(result, 0.3);
+}
+
+//  FragColor = vec4(0.0, 0.0, 0.9, 0.2);
 
 //    vec3 lightColor = vec3(0.0, 0.0, 1.0);
 //    // ambient 
@@ -60,6 +67,4 @@ void main()
 //    
 //    vec3 result = (ambient + diffuse + specular) * lightColor;
 //    FragColor = vec4(result, 1.0);
-}
-
 
